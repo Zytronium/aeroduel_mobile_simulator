@@ -165,7 +165,7 @@ const MobileSimulator = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-gray-200 mb-8">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">View Data</h3>
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Debug Tools</h3>
           <div className="flex gap-4">
             <button
               onClick={fetchMatchState}
