@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Smartphone, LogIn, Trophy, Users, AlertCircle, CheckCircle } from 'lucide-react';
 
 const MobileSimulator = () => {
@@ -7,7 +7,10 @@ const MobileSimulator = () => {
     planeId: 'sim-plane-001',
     playerName: 'Foxtrot-4',
     authToken: null,
+    matchId: null,
+    wsUrl: null,
     isJoined: false,
+    wsConnected: false,
     status: 'Not Joined'
   });
 
@@ -16,7 +19,10 @@ const MobileSimulator = () => {
     planeId: 'sim-plane-002',
     playerName: 'Delta-7',
     authToken: null,
+    matchId: null,
+    wsUrl: null,
     isJoined: false,
+    wsConnected: false,
     status: 'Not Joined'
   });
 
@@ -25,9 +31,125 @@ const MobileSimulator = () => {
   const [debugData, setDebugData] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
 
+  // Keep WebSocket instances outside of React state
+  const wsRefs = useRef({ 1: null, 2: null });
+
   const addLog = (mobile, message, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [{ mobile, message, type, timestamp }, ...prev].slice(0, 20));
+  };
+
+  const setupWebSocket = ({ mobileNum, matchId, wsUrl, authToken, userId }) => {
+    const setMobile = mobileNum === 1 ? setMobile1 : setMobile2;
+
+    if (!wsUrl || !matchId) {
+      addLog(`Mobile ${mobileNum}`, 'No WebSocket URL or matchId provided by server; skipping WS connection.', 'error');
+      return;
+    }
+
+    // Close any existing socket for this mobile
+    if (wsRefs.current[mobileNum]) {
+      try {
+        wsRefs.current[mobileNum].close();
+      } catch {
+        // ignore
+      }
+    }
+
+    addLog(`Mobile ${mobileNum}`, `Connecting WebSocket: ${wsUrl}`, 'info');
+
+    const ws = new WebSocket(wsUrl);
+    wsRefs.current[mobileNum] = ws;
+
+    ws.addEventListener('open', () => {
+      ws.send(
+        JSON.stringify({
+          type: 'hello',
+          role: 'mobile',
+          matchId,
+          userId,
+          authToken, // from /api/join-match
+        }),
+      );
+
+      setMobile(prev => ({
+        ...prev,
+        wsConnected: true,
+        status: 'Joined (WS Connecting/Live)',
+      }));
+      addLog(`Mobile ${mobileNum}`, 'WebSocket connection opened; hello sent.', 'success');
+    });
+
+    ws.addEventListener('message', (event) => {
+      let msg;
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        addLog(`Mobile ${mobileNum}`, `Received non-JSON WS message: ${event.data}`, 'error');
+        return;
+      }
+
+      switch (msg.type) {
+        case 'system:ack':
+          // Connected & authenticated
+          setMobile(prev => ({
+            ...prev,
+            wsConnected: true,
+            status: 'Live (WS Authenticated)',
+          }));
+          addLog(`Mobile ${mobileNum}`, 'WebSocket authenticated (system:ack).', 'success');
+          break;
+
+        case 'match:update':
+          // Show scores / status in UI (debug panel)
+          setDebugData({ type: `Match Update (Mobile ${mobileNum})`, data: msg });
+          setShowDebug(true);
+          addLog(`Mobile ${mobileNum}`, 'Received match:update.', 'info');
+          break;
+
+        case 'plane:hit':
+          // Optional per-hit animation – we log it for now
+          addLog(
+            `Mobile ${mobileNum}`,
+            `Received plane:hit event: ${JSON.stringify(msg)}`,
+            'info',
+          );
+          break;
+
+        case 'match:end':
+          // Show final scoreboard – log & push to debug panel
+          setDebugData({ type: `Match End (Mobile ${mobileNum})`, data: msg });
+          setShowDebug(true);
+          addLog(`Mobile ${mobileNum}`, 'Match ended (match:end).', 'success');
+          setMobile(prev => ({
+            ...prev,
+            wsConnected: false,
+            status: 'Match Ended',
+          }));
+          break;
+
+        default:
+          addLog(
+            `Mobile ${mobileNum}`,
+            `Received unknown WS message type "${msg.type}".`,
+            'info',
+          );
+      }
+    });
+
+    ws.addEventListener('close', () => {
+      setMobile(prev => ({
+        ...prev,
+        wsConnected: false,
+        status: prev.isJoined ? 'Joined (WS Closed)' : 'Not Joined',
+      }));
+      addLog(`Mobile ${mobileNum}`, 'WebSocket connection closed.', 'info');
+      wsRefs.current[mobileNum] = null;
+    });
+
+    ws.addEventListener('error', (err) => {
+      addLog(`Mobile ${mobileNum}`, `WebSocket error: ${err?.message || 'unknown error'}`, 'error');
+    });
   };
 
   const handleJoinMatch = async (mobileNum) => {
@@ -54,14 +176,35 @@ const MobileSimulator = () => {
           ...prev,
           isJoined: true,
           authToken: data.authToken,
+          matchId: data.matchId ?? prev.matchId,
+          wsUrl: data.wsUrl ?? prev.wsUrl,
+          wsConnected: false,
           status: 'Joined Match'
         }));
-        addLog(`Mobile ${mobileNum}`, `${mobile.playerName} joined match successfully! Token: ${data.authToken.substring(0, 8)}...`, 'success');
+        addLog(
+          `Mobile ${mobileNum}`,
+          `${mobile.playerName} joined match successfully! Token: ${data.authToken?.substring(0, 8) || 'no-token'}...`,
+          'success'
+        );
+
+        // Attempt to connect WebSocket using data from /api/join-match
+        setupWebSocket({
+          mobileNum,
+          matchId: data.matchId,
+          wsUrl: data.wsUrl,
+          authToken: data.authToken,
+          userId: mobile.userId,
+        });
       } else {
         throw new Error(data.error || 'Join failed');
       }
     } catch (error) {
-      setMobile(prev => ({ ...prev, status: 'Not Joined' }));
+      setMobile(prev => ({
+        ...prev,
+        status: 'Not Joined',
+        isJoined: false,
+        wsConnected: false,
+      }));
       addLog(`Mobile ${mobileNum}`, `Join failed: ${error.message}`, 'error');
     }
   };
@@ -95,11 +238,22 @@ const MobileSimulator = () => {
       <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-800">Mobile App #{mobileNum}</h2>
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
-            mobile.isJoined ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-          }`}>
-            <Smartphone className="w-4 h-4" />
-            <span className="text-sm font-medium">{mobile.status}</span>
+          <div className="flex flex-col items-end gap-1">
+            <div
+              className={`flex items-center gap-2 px-3 py-1 rounded-full ${
+                mobile.isJoined ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              <span className="text-sm font-medium">{mobile.status}</span>
+            </div>
+            <span
+              className={`text-xs font-mono ${
+                mobile.wsConnected ? 'text-green-600' : 'text-gray-400'
+              }`}
+            >
+              WS: {mobile.wsConnected ? 'Connected' : 'Disconnected'}
+            </span>
           </div>
         </div>
 
@@ -149,6 +303,21 @@ const MobileSimulator = () => {
       </div>
     );
   };
+
+  useEffect(() => {
+    // Cleanup WebSockets on unmount
+    return () => {
+      Object.values(wsRefs.current).forEach((ws) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.close();
+          } catch {
+            // ignore
+          }
+        }
+      });
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-8">
