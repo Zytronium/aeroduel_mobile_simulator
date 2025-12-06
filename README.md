@@ -46,15 +46,13 @@ Use it to quickly test and debug your Aeroduel game server's "mobile app" HTTP e
 ### 1. Install dependencies
 
 From the project root:
-```
-bash
+```bash
 npm install
 ```
 ### 2. Configure backend URL (optional)
 
 By default, the simulator points to:
-```
-text
+```text
 http://aeroduel.local:45045
 ```
 If your Aeroduel server is running elsewhere (e.g. `http://localhost:45321`), update the default URL in the app or configure DNS accordingly.
@@ -62,8 +60,7 @@ If your Aeroduel server is running elsewhere (e.g. `http://localhost:45321`), up
 > Tip: If you're using something like `aeroduel.local`, make sure your hosts file or DNS points it to the correct machine.
 
 ### 3. Run the development server
-```
-bash
+```bash
 npm run dev
 ```
 Then open the URL printed in your terminal (usually `http://localhost:5173`).
@@ -81,8 +78,7 @@ The simulator is a pure frontend client; it expects your Aeroduel server to expo
 Used when clicking **"Join Match"** on either mobile.
 
 **Request body (JSON):**
-```
-json
+```json
 {
 "planeId": "sim-plane-001",
 "userId": "sim-user-001",
@@ -93,8 +89,7 @@ json
 - `playerName` is editable before joining.
 
 **Expected success response (JSON):**
-```
-json
+```json
 {
 "authToken": "some-auth-token-string"
 }
@@ -105,8 +100,7 @@ json
   - Shows a success log entry (with the token truncated for display).
 
 **Expected error response (JSON):**
-```
-json
+```json
 {
 "error": "Description of why the join failed"
 }
@@ -158,8 +152,7 @@ to quickly iterate on and validate your Aeroduel HTTP API.
 ## Available npm Scripts
 
 Common scripts defined in `package.json` (typical for a Vite + React app):
-```
-bash
+```bash
 # Start dev server (with HMR)
 npm run dev
 
@@ -177,8 +170,7 @@ npm run lint
 ---
 
 ## Project Structure (High Level)
-```
-text
+```text
 aeroduel_mobile_simulator/
 public/          # Static assets served as-is
 src/
