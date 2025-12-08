@@ -194,6 +194,35 @@ const MobileSimulator = () => {
           });
           break;
 
+        case 'plane:poweron':
+          // When a plane powers on, re-enable the join button for that plane (based on planeId only).
+          // The event includes planeId and (sometimes empty) userId — we must act only on planeId.
+          {
+            const poweredPlaneId = msg.data?.planeId;
+            addLog(`Mobile ${mobileNum}`, `plane:poweron received for planeId: ${poweredPlaneId}`, 'info');
+
+            // If this event refers to mobile1's plane, clear its joined state so its Join button is re-enabled.
+            if (poweredPlaneId && poweredPlaneId === mobile1.planeId) {
+              setMobile1(prev => ({
+                ...prev,
+                isJoined: false,
+                status: 'Not Joined',
+              }));
+              addLog('Mobile 1', `Re-enabled Join for plane ${poweredPlaneId}`, 'success');
+            }
+
+            // If this event refers to mobile2's plane, clear its joined state so its Join button is re-enabled.
+            if (poweredPlaneId && poweredPlaneId === mobile2.planeId) {
+              setMobile2(prev => ({
+                ...prev,
+                isJoined: false,
+                status: 'Not Joined',
+              }));
+              addLog('Mobile 2', `Re-enabled Join for plane ${poweredPlaneId}`, 'success');
+            }
+          }
+          break;
+
         case 'match:end':
           // Show final scoreboard – log & push to debug panel
           setDebugData({ type: `Match End (Mobile ${mobileNum})`, data: msg });
