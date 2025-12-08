@@ -107,6 +107,16 @@ const MobileSimulator = () => {
           addLog(`Mobile ${mobileNum}`, 'Received match:update.', 'info');
           break;
 
+        case 'match:created':
+          // A new match lobby has been created
+          addLog(`Mobile ${mobileNum}`, 'New match created - you can join again.', 'info');
+          setMobile(prev => ({
+            ...prev,
+            isJoined: false,
+            status: 'Not Joined',
+          }));
+          break;
+
         case 'plane:hit':
           // Optional per-hit animation – we log it for now
           addLog(
@@ -114,6 +124,74 @@ const MobileSimulator = () => {
             `Received plane:hit event: ${JSON.stringify(msg)}`,
             'info',
           );
+          break;
+
+        case 'plane:kicked':
+          // Check if this mobile's plane was kicked
+          setMobile(prev => {
+            const kickedPlaneId = msg.data?.planeId;
+            addLog(
+              `Mobile ${mobileNum}`,
+              `Kick event received - planeId: ${kickedPlaneId}, my planeId: ${prev.planeId}`,
+              'info',
+            );
+
+            if (kickedPlaneId === prev.planeId) {
+              addLog(
+                `Mobile ${mobileNum}`,
+                `You were kicked from the match. Reason: ${msg.data?.reason || 'unknown'}`,
+                'error',
+              );
+              setDebugData({ type: `Kicked (Mobile ${mobileNum})`, data: msg });
+              setShowDebug(true);
+              return {
+                ...prev,
+                isJoined: false,
+                status: 'Kicked',
+              };
+            } else {
+              addLog(
+                `Mobile ${mobileNum}`,
+                `Plane ${kickedPlaneId} was kicked from the match.`,
+                'info',
+              );
+              return prev;
+            }
+          });
+          break;
+
+        case 'plane:disqualified':
+          // Check if this mobile's plane was disqualified
+          setMobile(prev => {
+            const disqualifiedPlaneId = msg.data?.planeId;
+            addLog(
+              `Mobile ${mobileNum}`,
+              `Disqualify event received - planeId: ${disqualifiedPlaneId}, my planeId: ${prev.planeId}`,
+              'info',
+            );
+
+            if (disqualifiedPlaneId === prev.planeId) {
+              addLog(
+                `Mobile ${mobileNum}`,
+                `You were disqualified from the match. Reason: ${msg.data?.reason || 'unknown'}`,
+                'error',
+              );
+              setDebugData({ type: `Disqualified (Mobile ${mobileNum})`, data: msg });
+              setShowDebug(true);
+              return {
+                ...prev,
+                isJoined: false,
+                status: 'Disqualified',
+              };
+            } else {
+              addLog(
+                `Mobile ${mobileNum}`,
+                `Plane ${disqualifiedPlaneId} was disqualified from the match.`,
+                'info',
+              );
+              return prev;
+            }
+          });
           break;
 
         case 'match:end':
@@ -244,7 +322,7 @@ const MobileSimulator = () => {
                 mobile.isJoined ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
               }`}
             >
-              <Smartphone className="w-4 h-4" />
+              <Smartphone className="w-4 h-4"/>
               <span className="text-sm font-medium">{mobile.status}</span>
             </div>
             <span
@@ -281,7 +359,8 @@ const MobileSimulator = () => {
           {mobile.authToken && (
             <div className="flex justify-between">
               <span className="text-gray-600">Auth Token:</span>
-              <span className="font-mono text-xs text-gray-700">{mobile.authToken.substring(0, 12)}...</span>
+              <span
+                className="font-mono text-xs text-gray-700">{mobile.authToken.substring(0, 12)}...</span>
             </div>
           )}
         </div>
@@ -296,7 +375,7 @@ const MobileSimulator = () => {
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
           >
-            <LogIn className="w-5 h-5" />
+            <LogIn className="w-5 h-5"/>
             {mobile.isJoined ? 'Already Joined' : 'Join Match'}
           </button>
         </div>
@@ -329,8 +408,8 @@ const MobileSimulator = () => {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <MobileControl mobileNum={1} mobile={mobile1} setMobile={setMobile1} />
-          <MobileControl mobileNum={2} mobile={mobile2} setMobile={setMobile2} />
+          <MobileControl mobileNum={1} mobile={mobile1} setMobile={setMobile1}/>
+          <MobileControl mobileNum={2} mobile={mobile2} setMobile={setMobile2}/>
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-gray-200 mb-8">
@@ -340,14 +419,14 @@ const MobileSimulator = () => {
               onClick={fetchMatchState}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
             >
-              <Trophy className="w-5 h-5" />
+              <Trophy className="w-5 h-5"/>
               View Match State
             </button>
             <button
               onClick={fetchPlanes}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors"
             >
-              <Users className="w-5 h-5" />
+              <Users className="w-5 h-5"/>
               View Planes & Scores
             </button>
           </div>
@@ -374,7 +453,8 @@ const MobileSimulator = () => {
           <h3 className="text-xl font-bold text-gray-800 mb-4">Activity Log</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {logs.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No activity yet. Try joining a match!</p>
+              <p className="text-gray-500 text-center py-8">No activity yet. Try joining a
+                match!</p>
             ) : (
               logs.map((log, idx) => (
                 <div
